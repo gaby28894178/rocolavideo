@@ -2,7 +2,7 @@
 
 # Archivos de compilación generados por PyInstaller
 build/
-dist/
+
 *.exe
 *.spec
 
