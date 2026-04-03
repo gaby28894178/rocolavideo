@@ -13,8 +13,15 @@ class ExploradorMultimedia:
         self.fuente = pygame.font.SysFont("Consolas", 18, bold=True)
         self.fuente_cola = pygame.font.SysFont("Consolas", 14, bold=True)
         
-        self.cols, self.filas = 5, 3
+        # --- CARGA DINÁMICA DESDE EL CONFIG ---
+        conf_sis = self.gestor.config['SISTEMA']
+        self.cols = int(conf_sis.get('columnas', 5))
+        self.filas = int(conf_sis.get('filas', 3))
+        self.items_por_pagina = self.cols * self.filas
+        
         self.ancho_p, self.alto_p = surface.get_size()
+        
+        # Ajuste de tamaño de carátulas (puedes tocar esto si cambias mucho la grilla)
         self.ancho_item, self.alto_item = 156, 156 
         self.margen_v, self.margen_h = 80, 55
         
@@ -24,6 +31,7 @@ class ExploradorMultimedia:
         self.vista_lista = None
         self.cola_nombres = []
 
+        # Fondo
         ruta_bg = os.path.join("Interface", "img", "base_background.png")
         self.background = None
         if os.path.exists(ruta_bg):
@@ -65,17 +73,22 @@ class ExploradorMultimedia:
 
             if not self.coleccion: return
 
-            inicio = (self.indice_sel // 15) * 15
-            items = self.coleccion[inicio : inicio + 15]
+            # Paginación dinámica según la grilla configurada
+            inicio = (self.indice_sel // self.items_por_pagina) * self.items_por_pagina
+            items = self.coleccion[inicio : inicio + self.items_por_pagina]
             sel_data = None
 
             for i, disco in enumerate(items):
+                # Cálculo de posición basado en columnas
                 x = self.margen_h + (i % self.cols) * (self.ancho_item + 35)
-                y = self.margen_v + (i // 5) * (self.alto_item + 35)
+                y = self.margen_v + (i // self.cols) * (self.alto_item + 35)
+                
                 if disco.textura is None: self.cargar_img(disco)
                 
-                if (i + inicio) == self.indice_sel: sel_data = (disco, x, y)
-                else: self.dibujar_caja(disco.textura, pygame.Rect(x, y, self.ancho_item, self.alto_item))
+                if (i + inicio) == self.indice_sel: 
+                    sel_data = (disco, x, y)
+                else: 
+                    self.dibujar_caja(disco.textura, pygame.Rect(x, y, self.ancho_item, self.alto_item))
 
             if sel_data:
                 disco, x, y = sel_data
@@ -83,13 +96,11 @@ class ExploradorMultimedia:
                 
                 if self.estado == "ANIMATING":
                     dt = pygame.time.get_ticks() - self.timer_anim
-                    # --- CAMBIO: Animación de 800ms (0.8 seg) ---
                     duracion = 800 
                     if dt < duracion:
-                        f = 1.0 + (0.50 * (dt/duracion)) # Zoom más controlado
+                        f = 1.0 + (0.50 * (dt/duracion))
                         img = pygame.transform.smoothscale(disco.textura, (int(self.ancho_item*f), int(self.alto_item*f)))
                         rect = img.get_rect(center=rect.center)
-                        # Movimiento más lento y suave
                         rect.y += math.sin(dt * 0.008) * 15 
                     else:
                         self.vista_lista = VistaCD(self.surface, self.disco_sel, self.fuente, self.gestor)
@@ -133,8 +144,7 @@ class ExploradorMultimedia:
         self.surface.blit(self.fuente_cola.render(cola, True, c), (r.x + 180, r.y + 15))
 
 
-
-#! Vistas de  selector de temas 
+# --- CLASE VISTA CD (CON RECORTE CINEMASCOPE 20%) ---
 class VistaCD:
     def __init__(self, surface, disco, fuente, gestor):
         self.surface, self.disco, self.fuente, self.gestor = surface, disco, fuente, gestor
@@ -144,13 +154,10 @@ class VistaCD:
         
         try:
             img_orig = pygame.image.load(disco.portada).convert()
-            # 1. Ratio base para cubrir la pantalla
             ratio = max(self.ancho_p / img_orig.get_width(), self.alto_p / img_orig.get_height())
             img_escalada = pygame.transform.smoothscale(img_orig, (int(img_orig.get_width()*ratio), int(img_orig.get_height()*ratio)))
             
-            # 2. AJUSTE DE BORDES (REDUCCIÓN AGRESIVA):
-            # 20% Arriba y Abajo (Factor 0.80) -> 10% que pediste + 10% que ya estaba
-            # 3% Izquierda y Derecha (Factor 0.97) para que no se pegue
+            # REDUCCIÓN: 20% Arriba/Abajo (0.80) y 3% Lados (0.97)
             nuevo_ancho = int(img_escalada.get_width() * 0.97)
             nuevo_alto = int(img_escalada.get_height() * 0.80)
             
@@ -160,12 +167,10 @@ class VistaCD:
             self.bg_final = pygame.Surface((int(self.ancho_p*0.97), int(self.alto_p*0.80)))
             self.bg_final.fill((30,30,30))
 
-        # El overlay se ajusta al nuevo tamaño de la imagen con el 20% de aire
         self.overlay = pygame.Surface(self.bg_final.get_size(), pygame.SRCALPHA)
         self.overlay.fill((0, 0, 0, 110)) 
 
     def manejar_eventos(self, tecla, t, cola_nombres):
-        """Maneja la navegación por la lista de temas"""
         if not self.play:
             cant = len(self.disco.archivos)
             if tecla == t.get('abajo').upper(): 
@@ -175,14 +180,10 @@ class VistaCD:
             elif tecla == t.get('enter').upper():
                 self.reproducir(cola_nombres)
             
-            # Control de scroll dinámico
-            if self.sel > 12:
-                self.scroll = (self.sel - 12) * 40
-            else:
-                self.scroll = 0
+            if self.sel > 12: self.scroll = (self.sel - 12) * 40
+            else: self.scroll = 0
 
     def reproducir(self, cola_nombres):
-        """Envía el tema seleccionado a la cola o al reproductor"""
         self.play = True
         self.timer = pygame.time.get_ticks()
         nombre_tema = self.disco.archivos[self.sel]
@@ -196,8 +197,7 @@ class VistaCD:
             try:
                 pygame.mixer.music.stop()
                 vlc_path = r"C:\Program Files\VideoLAN\VLC\vlc.exe"
-                if not os.path.exists(vlc_path):
-                    vlc_path = r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"
+                if not os.path.exists(vlc_path): vlc_path = r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"
                 
                 if os.path.exists(vlc_path):
                     cmd = f'"{vlc_path}" "{path}" --fullscreen --play-and-exit --no-video-title-show'
@@ -207,41 +207,33 @@ class VistaCD:
         else:
             try:
                 if not pygame.mixer.music.get_busy():
-                    pygame.mixer.music.load(path)
-                    pygame.mixer.music.play()
+                    pygame.mixer.music.load(path); pygame.mixer.music.play()
                 else:
                     pygame.mixer.music.queue(path)
                     cola_nombres.append(nombre_tema[:20])
             except: pass
 
     def dibujar(self):
-        # Fondo negro sólido para el marco "Cinemascope"
         self.surface.fill((0,0,0))
-        
-        # Dibujamos la portada achicada un 20% en el alto
         rect_bg = self.bg_final.get_rect(center=(self.ancho_p//2, self.alto_p//2))
         self.surface.blit(self.bg_final, rect_bg)
         self.surface.blit(self.overlay, rect_bg)
         
-        # Lista de canciones con sombra
         for i, tema in enumerate(self.disco.archivos):
             y = 100 + (i * 40) - self.scroll
             if 80 < y < 680:
                 color = (255, 255, 255)
                 if i == self.sel:
-                    # Selección con color animado
                     c = [(255,0,255), (0,255,255), (255,255,0)][(pygame.time.get_ticks()//150)%3]
                     pygame.draw.rect(self.surface, c, (50, y-5, 920, 40), 2, border_radius=5)
                     color = c
                 
-                # Renderizado de texto
                 sombra = self.fuente.render(f"{i+1:02d}. {tema[:70]}", True, (0, 0, 0))
                 self.surface.blit(sombra, (77, y + 2))
                 txt = self.fuente.render(f"{i+1:02d}. {tema[:70]}", True, color)
                 self.surface.blit(txt, (75, y))
         
         if self.play:
-            # Notificación de cola
             pygame.draw.rect(self.surface, (0,0,0), (300, 690, 420, 40))
             self.surface.blit(self.fuente.render("¡AÑADIDO A LA COLA!", True, (0, 255, 0)), (380, 700))
             if pygame.time.get_ticks() - self.timer > 1200: 
