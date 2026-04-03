@@ -9,7 +9,7 @@ from Interface.Explorador import ExploradorMultimedia
 
 def main():
     pygame.init()
-    RES_X, RES_Y = 1224, 768
+    RES_X, RES_Y = 1024, 768
     screen = pygame.display.set_mode((RES_X, RES_Y))
     pygame.display.set_caption("FONOLA GABYSOFT")
 
