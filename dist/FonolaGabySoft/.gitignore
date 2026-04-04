@@ -1,0 +1,28 @@
+# .gitignore para el proyecto FonolaGabySoft
+
+# Archivos de compilación generados por PyInstaller
+build/
+
+*.exe
+*.spec
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Otros archivos temporales
+*.log
+*.tmp
+
+# Comando de compilación (para referencia):
+# python -m PyInstaller --noconfirm --onedir --windowed --icon "icono_app.ico" --add-data "Interface;Interface" --add-data "Logic;Logic" --name "FonolaGabySoft" "main.py"
+
+# Archivos necesarios de la raíz (asegúrate de que estén presentes):
+# constructor/config.ini
+# constructor/configteclas.ini
+# constructor/FonolaGabySoft.spec
+# constructor/README.md
+# constructor/teclas_disponibles.json
+# constructor/url.ini
